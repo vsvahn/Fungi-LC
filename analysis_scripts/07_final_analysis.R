@@ -16,7 +16,7 @@ library(pROC)
 ## load and prep data ----
 
 # read in predictor data 
-predictors <- read.csv('02_cleaned_data/predictors/all_sp_predictors_5.2.24.csv') %>% mutate(Threatened = as.factor(Threatened))
+predictors <- read.csv('02_cleaned_data/predictors.csv') %>% mutate(Threatened = as.factor(Threatened))
 
 #split the species into ones that have been assessed (labelled)
 # and those that haven’t (unlabelled) ----
