@@ -23,30 +23,30 @@ geo.occs <- occs %>%
   filter(georeferenced==T) %>% 
   mutate(roundDecimalLatitude = round(decimalLatitude, digits = 3),
          roundDecimalLongitude = round(decimalLongitude, digits = 3)) %>% 
-  distinct(acceptedName, roundDecimalLatitude, roundDecimalLongitude, .keep_all = T)
+  distinct(acceptedNameAuthor, roundDecimalLatitude, roundDecimalLongitude, .keep_all = T)
 
 #filter nongeoreferenced records from same locality per species 
 clean.occs <- occs %>%
   filter(!is.na(locality) & georeferenced==F) %>%
-  distinct(acceptedName, locality, .keep_all = TRUE) %>%
+  distinct(acceptedNameAuthor, locality, .keep_all = TRUE) %>%
   bind_rows(geo.occs) %>%
   bind_rows(occs %>% filter(is.na(locality) &  georeferenced==F))
 
 # calculate specimen count 
 spec.count <- clean.occs %>%
-  count(acceptedName, name = 'specimenCount')
+  count(acceptedNameAuthor, name = 'specimenCount')
 
 ## Calculate number of 'contemporary' (>1992) records
 contemp_records <- occs %>%
-  distinct(acceptedName, locality, year, .keep_all = T) %>%
-  distinct(acceptedName, decimalLatitude, decimalLongitude, year, .keep_all=T) %>%
-  group_by(acceptedName) %>%
+  distinct(acceptedNameAuthor, locality, year, .keep_all = T) %>%
+  distinct(acceptedNameAuthor, decimalLatitude, decimalLongitude, year, .keep_all=T) %>%
+  group_by(acceptedNameAuthor) %>%
   summarize(propContemporary = mean(year > 1992, na.rm = T)) %>%
   mutate(propContemporary = ifelse(is.na(propContemporary), 0, propContemporary))
 
 # calculate final variables
 spec.count <- spec.count %>%
-  left_join(contemp_records, by='acceptedName') %>%
+  left_join(contemp_records, by='acceptedNameAuthor') %>%
   mutate(logSpecimenCount = log(specimenCount)) 
 
 
@@ -73,17 +73,17 @@ basionyms <- backbone %>%
 
 # find year of publication of basionyms for species in list
 year <- backbone %>%
-  filter(CURRENT.NAME %in% all_names$acceptedName &
+  filter(CURRENT.NAME %in% all_names$acceptedNameAuthor &
            (RECORD.NUMBER == CURRENT.NAME.RECORD.NUMBER |
               NAME.OF.FUNGUS == CURRENT.NAME)) %>% 
   left_join(basionyms, join_by(CURRENT.NAME)) %>%
   mutate(yearPublished = YEAR.OF.PUBLICATION.y) %>%
   dplyr::select(c(CURRENT.NAME, yearPublished)) %>%
-  rename(acceptedName = CURRENT.NAME)  %>% 
+  rename(acceptedNameAuthor = CURRENT.NAME)  %>% 
   distinct(.keep_all = T) 
 
 # find species missed
-missed <- all_names %>% filter(!(acceptedName %in% year.pub$acceptedName)) %>% distinct(acceptedName)
+missed <- all_names %>% filter(!(acceptedNameAuthor %in% year.pub$acceptedNameAuthor)) %>% distinct(acceptedNameAuthor)
 # find year of publication for basionyms of unplaced species
 basionyms2 <- backbone %>%
   filter(RECORD.NUMBER == BASIONYM.RECORD.NUMBER) %>%
@@ -92,16 +92,16 @@ basionyms2 <- backbone %>%
 
 # find year of publication of basionyms of unplcaed species
 year2 <- backbone %>%
-  filter(NAME.OF.FUNGUS %in% missed$AcceptedName) %>%
+  filter(NAME.OF.FUNGUS %in% missed$acceptedNameAuthor) %>%
   left_join(basionyms2, join_by(NAME.OF.FUNGUS)) %>%
   mutate(yearPublished = YEAR.OF.PUBLICATION.y) %>%
   dplyr::select(c(NAME.OF.FUNGUS, yearPublished)) %>%
-  rename(AcceptedName = NAME.OF.FUNGUS) %>% 
+  rename(acceptedNameAuthor = NAME.OF.FUNGUS) %>% 
   distinct(.keep_all = T) 
 
 # add assessed species missing from species fungorum
 manual_years <- data.frame(
-  acceptedName = c('Sarcodon joeides', 'Gomphidius smithii', 'Elaphomyces decipiens'),
+  acceptedNameAuthor = c('Sarcodon joeides', 'Gomphidius smithii', 'Elaphomyces decipiens'),
   yearPublished = c(1872, 1949, 1831)
 )
 
@@ -115,12 +115,12 @@ year.all <- rbind(year, year2, manual_years) %>%
 
 # load in threat status of training species
 threat <- read_csv('02_cleaned_data/training_sp_filtered.csv') %>%
-  select(c(acceptedName, Threatened)) 
+  select(c(acceptedNameAuthor, Threatened)) 
 
 # combine predictors
-predictors <- left_join(spec.count, year, by='acceptedName') %>%
+predictors <- left_join(spec.count, year, by='acceptedNameAuthor') %>%
   drop_na() # drop species with missing values
-predictors <- left_join(sp_predictors, threat, by='acceptedName')
+predictors <- left_join(sp_predictors, threat, by='acceptedNameAuthor')
 
 # save predictor data
 write_csv(predictors, '02_cleaned_data/predictors.csv')

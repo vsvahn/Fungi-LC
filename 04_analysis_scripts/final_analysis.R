@@ -39,7 +39,7 @@ plot(fit)
 summary(fit)
 
 ## model validation - k fold cross validation ----
-kf = kfold(fit, save_fits = T)
+#kf = kfold(fit, save_fits = T)
 
 ## plot results for training species ----
 labelled %>%
@@ -62,10 +62,11 @@ labelled %>%
   geom_text(aes(x = 50, y = .4, label = "Predicted not threatened"),
             color = "#60C659", size = 4)
 
-## make predictions ----
-labelled  <- labelled %>%
+## find predicted values for labelled species ----
+labelled <-  labelled %>%
   add_epred_draws(fit) %>%
-  median_qi(.epred) 
+  median_qi(.epred) %>%
+  mutate(pred.class = ifelse(.epred<0.5, 0, 1))
 
 
 ## make predictions ----
@@ -75,7 +76,7 @@ predictions <-  unlabelled %>%
   mutate(pred.class = ifelse(.epred<0.5, 0, 1))
 
 
-## calculate optimal threshold for confident LCs
+## calculate optimal threshold for confident LCs ----
 
 # function to calculate threshold for a given false negative rate on assessed species
 calculate_threshold_for_fnr <- function(observed, predicted, desired_fnr) {
@@ -104,12 +105,18 @@ threshold <- calculate_threshold_for_fnr(labelled$Threatened, labelled$.epred, 0
 cat("Threshold for FNR of", desired_fnr, ":", threshold, "\n")
 
 
-## find confidently LC species --
+## find confidently LC species ----
 
 # use threshold from above
 # find species with 95% conf. int. of posterior dist. within threshold
-num_lc <- sum(predictions$.upper < threshold)
+num_lc <- sum(predictions$.upper < threshold )
 glue("{(num_lc)} of macrofungi species confidently least concern")
-lc <- predictions %>% filter(.upper < threshold)
+lc <- predictions %>%
+  filter(.upper < threshold) %>%
+  select(c(acceptedNameAuthor, specimenCount, propContemporary, yearPublished, .epred, .lower, .upper)) %>%
+  rename(medianPrediction = .epred, lower95ConfInt = .lower, upper95ConfInt = .upper) %>%
+  arrange(medianPrediction) %>% 
+  mutate_if(is.numeric, round, digits = 3)
 
-
+## save confident LCs ----
+write_csv(lc, '05_outputs/confident_lcs.csv')
